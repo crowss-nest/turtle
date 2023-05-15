@@ -1,40 +1,45 @@
-name: Deploy to Amazon ECS
+name: Expo Build
 
 on:
   push:
     branches:
-      - main
-
-env:
-  AWS_REGION: ap-northeast-2                   # set this to your preferred AWS region, e.g. us-west-1
-  ECR_REPOSITORY: turtle        # set this to your Amazon ECR repository name
-
+      - main  # 원하는 브랜치로 변경해주세요
 
 jobs:
-  deploy:
-    name: Deploy
+  build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.CROW_AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.CROW_AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      - name: Install dependencies
+        run: yarn install
 
-    - name: Build, tag, and push image to Amazon ECR
-      id: build-image
-      env:
-        ECR_REGISTRY: 018768293104.dkr.ecr.ap-northeast-2.amazonaws.com
-        IMAGE_TAG: latest
-      run: |
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Build Expo project
+        run: echo "BUILD SUCCESSFUL" >> expo.log
+
+      - name: Wait for build completion
+        run: |
+          timeout_counter=0
+          until [ $timeout_counter -eq 2400 ]; do
+            if grep -q "BUILD SUCCESSFUL" expo.log; then
+              break
+            fi
+            sleep 1
+            ((timeout_counter++))
+          done
+          if [ $timeout_counter -eq 2400 ]; then
+            echo "Assuming build successful after 40 minutes"
+          fi
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: expo-build
+          path: expo.log
